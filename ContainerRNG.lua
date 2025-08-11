@@ -10,8 +10,10 @@ local name = plr.Name
 local plot = nil
 
 for _, blot in ipairs(workspace:WaitForChild("Gameplay"):WaitForChild("Plots"):GetChildren()) do
-    local label = blot.PlotLogic.PlotNameSign.PlayerInfoSign.PlayerNameSign.MainFrame.NameLabel
-    if label.Text:find(name .. "'s") then
+    local ok, label = pcall(function()
+        return blot.PlotLogic.PlotNameSign.PlayerInfoSign.PlayerNameSign.MainFrame.NameLabel
+    end)
+    if ok and label and label.Text:find(name .. "'s") then
         plot = blot
         break
     end
@@ -51,6 +53,10 @@ local function rebuildContainerLists()
     table.sort(containerOptions)
 end
 
+local t0 = os.clock()
+while #containerRepo:GetChildren() == 0 and os.clock() - t0 < 5 do
+    task.wait(0.2)
+end
 rebuildContainerLists()
 
 local flowerMap = {}
@@ -172,10 +178,10 @@ Tab:CreateToggle({
     CurrentValue = false,
     Callback = function(Value)
         speed = Value
-
         if speed and customers then
+            local v = speedV or 16
             for _, customer in ipairs(customers:GetChildren()) do
-                customer:WaitForChild("Humanoid").WalkSpeed = Value
+                customer:WaitForChild("Humanoid").WalkSpeed = v
             end
         end
     end,
@@ -237,21 +243,23 @@ Container:CreateToggle({
 
 
 -- Selected container (from repo list)
-local defaultChoice = table.find(containerOptions, "CamoContainer") and "CamoContainer" or containerOptions[1]
-if not table.find(containerOptions, defaultChoice) and #containerOptions > 0 then
-    defaultChoice = containerOptions[1]
-end
-local selectedContainer = defaultChoice
+local selectedContainer
+if #containerOptions == 0 then
+    warn("No containers found in ReplicatedStorage/Assets/Assets/Containers yet")
+else
+    local defaultChoice = table.find(containerOptions, "CamoContainer") and "CamoContainer" or containerOptions[1]
+    selectedContainer = defaultChoice
 
-Container:CreateDropdown({
-    Name = "Buyable Container (from ReplicatedStorage/Assets/Assets/Containers)",
-    Options = containerOptions,
-    CurrentOption = defaultChoice,
-    MultipleOptions = false,
-    Callback = function(Option)
-        selectedContainer = typeof(Option) == "table" and Option[1] or Option
-    end,
-})
+    Container:CreateDropdown({
+        Name = "Buyable Container (from ReplicatedStorage/Assets/Assets/Containers)",
+        Options = containerOptions,
+        CurrentOption = defaultChoice,
+        MultipleOptions = false,
+        Callback = function(Option)
+            selectedContainer = typeof(Option) == "table" and Option[1] or Option
+        end,
+    })
+end
 
 
 
@@ -320,48 +328,40 @@ Container:CreateSlider({
     end,
 })
 
-local selectedFlower = "BasicFlowerContainer"
+if #flowerOptions > 0 then
+    local selectedFlower = flowerOptions[1]
+    Container:CreateDropdown({
+        Name = "Flower Container",
+        Options = flowerOptions,
+        CurrentOption = selectedFlower,
+        MultipleOptions = false,
+        Callback = function(Option)
+            selectedFlower = typeof(Option) == "table" and Option[1] or Option
+        end,
+    })
 
-Container:CreateDropdown({
-    Name = "Flower Container",
-    Options = flowerOptions,
-    CurrentOption = "BasicFlowerContainer",
-    MultipleOptions = false,
-    Callback = function(Option)
-        selectedFlower = typeof(Option) == "table" and Option[1] or Option
-    end,
-})
-
-local buyDelayFlower
-
-Container:CreateToggle({
-    Name = "Auto Buy Flower Container",
-    CurrentValue = false,
-    Callback = function(Value)
-        _G.buyflower = Value
-        while _G.buyflower do
-            local e = flowerMap[selectedFlower]
-            if not e then
-                warn("Invalid container:", selectedFlower)
-                break
+    local buyDelayFlower
+    Container:CreateToggle({
+        Name = "Auto Buy Flower Container",
+        CurrentValue = false,
+        Callback = function(Value)
+            _G.buyflower = Value
+            while _G.buyflower do
+                local e = flowerMap[selectedFlower]
+                if not e then break end
+                remote:FireServer(buffer.fromstring("\26"), buffer.fromstring("\254\1\0\6" .. e))
+                task.wait(buyDelayFlower or 0)
             end
-
-            remote:FireServer(buffer.fromstring("\26"), buffer.fromstring("\254\1\0\6" .. e))
-
-            task.wait(buyDelayFlower or 0)
-        end
-    end,
-})
-
-Container:CreateSlider({
-    Name = "Buy Delay",
-    Range = {0, 60},
-    Increment = 0.1,
-    CurrentValue = 0,
-    Callback = function(Value)
-        buyDelayFlower = Value
-    end,
-})
+        end,
+    })
+    Container:CreateSlider({
+        Name = "Buy Delay",
+        Range = {0, 60},
+        Increment = 0.1,
+        CurrentValue = 0,
+        Callback = function(Value) buyDelayFlower = Value end,
+    })
+end
 
 local Upgrades = Window:CreateTab("Upgrades")
 
