@@ -1,38 +1,28 @@
--- ▶ Container RNG – Containers Only (dynamic)
--- Scans ReplicatedStorage/Assets/Assets/Containers for options.
--- Defaults to "CamoContainer". Remove everything unrelated to containers.
+-- loadstring(game:HttpGet("https://raw.githubusercontent.com/xXGeminiXx/privatenonsense/refs/heads/main/ContainerRNG.lua?token=GHSAT0AAAAAADJBGXSP7MRELZECFHCTESYW2E2IJ3Q",true))()
 
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
-
-local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-
-local remote = ReplicatedStorage
-    :WaitForChild("Modules")
-    :WaitForChild("Shared")
-    :WaitForChild("Warp")
-    :WaitForChild("Index")
-    :WaitForChild("Event")
-    :WaitForChild("Reliable")
-
+local Players = game:GetService("Players")
+local remote = game:GetService("ReplicatedStorage"):WaitForChild("Modules"):WaitForChild("Shared"):WaitForChild("Warp"):WaitForChild("Index"):WaitForChild("Event"):WaitForChild("Reliable")
 local plr = Players.LocalPlayer
 
--- Find your plot
-local function findPlotForPlayer(playerName)
-    local plots = workspace:WaitForChild("Gameplay"):WaitForChild("Plots")
-    for _, blot in ipairs(plots:GetChildren()) do
-        local label = blot.PlotLogic.PlotNameSign.PlayerInfoSign.PlayerNameSign.MainFrame.NameLabel
-        if label.Text:find(playerName .. "'s") then
-            return blot
-        end
+local name = plr.Name
+local plot = nil
+
+for _, blot in ipairs(workspace:WaitForChild("Gameplay"):WaitForChild("Plots"):GetChildren()) do
+    local label = blot.PlotLogic.PlotNameSign.PlayerInfoSign.PlayerNameSign.MainFrame.NameLabel
+    if label.Text:find(name .. "'s") then
+        plot = blot
+        break
     end
-    return nil
 end
 
-local plot = findPlotForPlayer(plr.Name)
 if not plot then error("No plot found, disabling") return end
 
+local coinHolder = workspace:WaitForChild("Gameplay"):WaitForChild("CoinHolder")
+local customers = workspace:WaitForChild("Gameplay"):WaitForChild("Customers")
 local containerHolder = plot:WaitForChild("PlotLogic"):WaitForChild("ContainerHolder")
+local itemCache = plot.PlotLogic.ItemCache
 
 -- Repo path for available containers
 local containerRepo
@@ -63,7 +53,17 @@ end
 
 rebuildContainerLists()
 
--- UI
+local flowerMap = {}
+local flowerOptions = {}
+
+-- If flowers are in the same containerHolder, filter by name pattern
+for _, container in ipairs(containerHolder:GetChildren()) do
+    if container.Name:lower():find("flower") then
+        flowerMap[container.Name] = string.char(20) .. container.Name -- adjust char if needed
+        table.insert(flowerOptions, container.Name)
+    end
+end
+
 local Window = Rayfield:CreateWindow({
     Name = "▶ Container RNG ◀",
     Icon = 0,
@@ -72,8 +72,152 @@ local Window = Rayfield:CreateWindow({
     Theme = "DarkBlue",
 })
 
+local Tab = Window:CreateTab("Main")
+
+Tab:CreateSection("Main")
+
+Tab:CreateToggle({
+    Name = "Coin Collector",
+    CurrentValue = false,
+    Callback = function(Value)
+        if not coinHolder then
+            error("watafak no coin folder")
+            return
+        end
+        _G.coin = Value
+        while _G.coin do
+            for _, coin in ipairs(coinHolder:GetChildren()) do
+                remote:FireServer(buffer.fromstring("\6"), buffer.fromstring("\254\1\0\6".."0" .. coin.Name))
+            end
+            task.wait()
+        end
+    end,
+})
+
+local delete
+
+Tab:CreateToggle({
+    Name = "Item Collector",
+    CurrentValue = false,
+    Callback = function(Value)
+        if not itemCache then
+            error("watafak no item folder")
+            return
+        end
+
+        _G.item = Value
+
+        local housePart = plot:WaitForChild("PlotDecor"):WaitForChild("House"):WaitForChild("Part")
+
+        while _G.item do
+            for _, item in ipairs(itemCache:GetChildren()) do
+                if item:IsA("Model") and item.PrimaryPart then
+                    local itemPos = item.PrimaryPart.Position
+                    local housePos = housePart.Position
+                    local houseSize = housePart.Size
+
+                    local inBounds =
+                        math.abs(itemPos.X - housePos.X) <= houseSize.X / 2 and
+                        math.abs(itemPos.Z - housePos.Z) <= houseSize.Z / 2 and
+                        itemPos.Y >= housePos.Y
+
+                    if not inBounds then
+                        remote:FireServer(buffer.fromstring("\v"), buffer.fromstring("\254\1\0\6)" .. item.Name))
+                    else 
+                        if delete then 
+                            item:Destroy()
+                        end
+                    end
+                end
+            end
+            task.wait()
+        end
+    end,
+})
+
+Tab:CreateToggle({
+    Name = "Delete Plot Items",
+    CurrentValue = false,
+    Callback = function(Value)
+        print("It will get deleted when u enable item collector btw")
+        delete = Value
+    end,
+})
+
+Tab:CreateToggle({
+    Name = "Auto Drop Items",
+    CurrentValue = false,
+    Callback = function(Value)
+        _G.drop = Value
+
+        if Value then
+            local housePart = plot:WaitForChild("PlotDecor"):WaitForChild("House"):WaitForChild("Part")
+
+            plr.Character.HumanoidRootPart.CFrame = housePart.CFrame + Vector3.new(0, 7, 0)
+
+            while _G.drop do
+                remote:FireServer(buffer.fromstring("\t"), buffer.fromstring("\254\0\0"))
+
+                task.wait(0.1)
+            end
+        end
+    end,
+})
+
+local speed
+local speedV
+
+Tab:CreateToggle({
+    Name = "Customer Speed",
+    CurrentValue = false,
+    Callback = function(Value)
+        speed = Value
+
+        if speed and customers then
+            for _, customer in ipairs(customers:GetChildren()) do
+                customer:WaitForChild("Humanoid").WalkSpeed = Value
+            end
+        end
+    end,
+})
+
+Tab:CreateSlider({
+    Name = "Speed",
+    Range = {16, 250},
+    Increment = 1,
+    CurrentValue = 16,
+    Callback = function(Value)
+        speedV = Value
+
+        if speed and customers then
+            for _, customer in ipairs(customers:GetChildren()) do
+                customer:WaitForChild("Humanoid").WalkSpeed = Value
+            end
+        end
+    end,
+})
+
+customers.ChildAdded:Connect(function(customer)
+    if not speed or not speedV then return end
+    customer:WaitForChild("Humanoid").WalkSpeed = speedV
+end)
+
+Tab:CreateButton({
+    Name = "Toggle Notifications",
+    Callback = function()
+        local pask = plr.PlayerGui
+        for _, thing in ipairs(pask:GetChildren()) do
+            if thing:FindFirstChild("NotificationFrame") then
+                local frame = thing:FindFirstChild("NotificationFrame")
+                frame.Visible = not frame.Visible
+            end
+        end
+    end,
+})
+
 local Container = Window:CreateTab("Container")
-Container:CreateSection("Live Containers")
+
+Container:CreateSection("Container")
 
 -- Open all placed containers on your plot
 Container:CreateToggle({
@@ -91,8 +235,9 @@ Container:CreateToggle({
     end,
 })
 
+
 -- Selected container (from repo list)
-local defaultChoice = "CamoContainer"
+local defaultChoice = table.find(containerOptions, "CamoContainer") and "CamoContainer" or containerOptions[1]
 if not table.find(containerOptions, defaultChoice) and #containerOptions > 0 then
     defaultChoice = containerOptions[1]
 end
@@ -108,13 +253,40 @@ Container:CreateDropdown({
     end,
 })
 
--- Controls
-local buyDelay = 0
-local maxContainers = 8
-local minMoney = 0
+
+
+local buyDelay
+local maxContainers
+local minMoney
+
+Container:CreateToggle({
+    Name = "Auto Buy Container",
+    CurrentValue = false,
+    Callback = function(Value)
+        _G.buy = Value
+        while _G.buy do
+            local e = containerMap[selectedContainer]
+            if not e then
+                warn("Invalid container:", selectedContainer)
+                break
+            end
+
+            local max = maxContainers or 8
+            local containers = #containerHolder:GetChildren()
+
+            local money = tonumber(plr:FindFirstChild("leaderstats") and plr.leaderstats:FindFirstChild("Money") and plr.leaderstats.Money.Value) or 0
+
+            if containers < max and (not minMoney or money >= minMoney) then
+                remote:FireServer(buffer.fromstring("\26"), buffer.fromstring("\254\1\0\6" .. e))
+            end
+            
+            task.wait(buyDelay or 0)
+        end
+    end,
+})
 
 Container:CreateSlider({
-    Name = "Max Containers on Plot",
+    Name = "Max Containers",
     Range = {1, 8},
     Increment = 1,
     CurrentValue = 8,
@@ -129,13 +301,17 @@ Container:CreateInput({
    PlaceholderText = "$",
    RemoveTextAfterFocusLost = false,
    Callback = function(Text)
-        local v = tonumber(Text)
-        if v then minMoney = v else warn("Invalid money input") end
+        local value = tonumber(Text)
+        if value then
+            minMoney = value
+        else
+            warn("Invalid money input")
+        end
    end,
 })
 
 Container:CreateSlider({
-    Name = "Buy Delay (seconds)",
+    Name = "Buy Delay",
     Range = {0, 60},
     Increment = 0.1,
     CurrentValue = 0,
@@ -144,67 +320,213 @@ Container:CreateSlider({
     end,
 })
 
--- Advanced: allow changing the opcodeByte in case game updates it
-Container:CreateInput({
-   Name = "Opcode Byte (prefix) – default 15",
-   CurrentValue = tostring(opcodeByte),
-   PlaceholderText = "15",
-   RemoveTextAfterFocusLost = false,
-   Callback = function(Text)
-        local v = tonumber(Text)
-        if v and v >= 0 and v <= 255 then
-            opcodeByte = v
-            -- Rebuild map with new prefix
-            for _, name in ipairs(containerOptions) do
-                containerMap[name] = string.char(opcodeByte) .. name
-            end
-        else
-            warn("Invalid opcode byte (0-255).")
-        end
-   end,
-})
+local selectedFlower = "BasicFlowerContainer"
 
--- Rescan if devs add/remove containers
-Container:CreateButton({
-    Name = "Rescan Available Containers",
-    Callback = function()
-        rebuildContainerLists()
-        -- optional: if selected disappears, reset
-        if not table.find(containerOptions, selectedContainer) then
-            selectedContainer = containerOptions[1]
-        end
-        Rayfield:Notify({
-            Title = "Rescan Complete",
-            Content = ("Found %d containers."):format(#containerOptions),
-            Duration = 3
-        })
+Container:CreateDropdown({
+    Name = "Flower Container",
+    Options = flowerOptions,
+    CurrentOption = "BasicFlowerContainer",
+    MultipleOptions = false,
+    Callback = function(Option)
+        selectedFlower = typeof(Option) == "table" and Option[1] or Option
     end,
 })
 
--- Buyer
+local buyDelayFlower
+
 Container:CreateToggle({
-    Name = "Auto Buy Selected Container",
+    Name = "Auto Buy Flower Container",
     CurrentValue = false,
     Callback = function(Value)
-        _G._autoBuy = Value
-        while _G._autoBuy do
-            local payloadSuffix = containerMap[selectedContainer]
-            if not payloadSuffix then
-                warn("Invalid container: ", selectedContainer)
+        _G.buyflower = Value
+        while _G.buyflower do
+            local e = flowerMap[selectedFlower]
+            if not e then
+                warn("Invalid container:", selectedFlower)
                 break
             end
 
-            local current = #containerHolder:GetChildren()
-            local money = tonumber(plr:FindFirstChild("leaderstats")
-                and plr.leaderstats:FindFirstChild("Money")
-                and plr.leaderstats.Money.Value) or 0
+            remote:FireServer(buffer.fromstring("\26"), buffer.fromstring("\254\1\0\6" .. e))
 
-            if current < maxContainers and money >= minMoney then
-                -- purchase
-                remote:FireServer(buffer.fromstring("\26"), buffer.fromstring("\254\1\0\6" .. payloadSuffix))
-            end
-
-            task.wait(buyDelay)
+            task.wait(buyDelayFlower or 0)
         end
+    end,
+})
+
+Container:CreateSlider({
+    Name = "Buy Delay",
+    Range = {0, 60},
+    Increment = 0.1,
+    CurrentValue = 0,
+    Callback = function(Value)
+        buyDelayFlower = Value
+    end,
+})
+
+local Upgrades = Window:CreateTab("Upgrades")
+
+Upgrades:CreateSection("Upgrades")
+
+Upgrades:CreateToggle({
+    Name = "Upgrade Inventory Size",
+    CurrentValue = false,
+    Callback = function(Value)
+        _G.upgradeinv = Value
+        while _G.upgradeinv do
+            remote:FireServer(buffer.fromstring("5"), buffer.fromstring("\254\1\0\6\17MaxInventoryItems"))
+
+            task.wait(0.5)
+        end
+    end,
+})
+
+Upgrades:CreateToggle({
+    Name = "Upgrade Max Flowers Placed",
+    CurrentValue = false,
+    Callback = function(Value)
+        _G.upgradeflowers = Value
+        while _G.upgradeflowers do
+            remote:FireServer(buffer.fromstring("5"), buffer.fromstring("\254\1\0\6\16MaxFlowersPlaced"))
+
+            task.wait(0.5)
+        end
+    end,
+})
+
+Upgrades:CreateToggle({
+    Name = "Upgrade Max Customers",
+    CurrentValue = false,
+    Callback = function(Value)
+        _G.upgradecustomers = Value
+        while _G.upgradecustomers do
+            remote:FireServer(buffer.fromstring("5"), buffer.fromstring("\254\1\0\6\fMaxCustomers"))
+
+            task.wait(0.5)
+        end
+    end,
+})
+
+Upgrades:CreateToggle({
+    Name = "Upgrade Max Containers",
+    CurrentValue = false,
+    Callback = function(Value)
+        _G.upgradecontainers = Value
+        while _G.upgradecontainers do
+            remote:FireServer(buffer.fromstring("5"), buffer.fromstring("\254\1\0\6\rMaxContainers"))
+
+            task.wait(0.5)
+        end
+    end,
+})
+
+Upgrades:CreateToggle({
+    Name = "Upgrade Max Plot Items",
+    CurrentValue = false,
+    Callback = function(Value)
+        _G.upgradepitems = Value
+        while _G.upgradepitems do
+            remote:FireServer(buffer.fromstring("5"), buffer.fromstring("\254\1\0\6\14MaxItemsOnPlot"))
+
+            task.wait(0.5)
+        end
+    end,
+})
+
+local Event = Window:CreateTab("Event")
+
+Event:CreateSection("Event")
+
+Event:CreateButton({
+    Name = "Buy Lavender [10M]",
+    Callback = function()
+        remote:FireServer(buffer.fromstring("\22"), buffer.fromstring("\254\1\0\6\bLavender"))
+    end,
+})
+
+Event:CreateButton({
+    Name = "Buy Lilly Pad [1B]",
+    Callback = function()
+        remote:FireServer(buffer.fromstring("\22"), buffer.fromstring("\254\1\0\6\bLillyPad"))
+    end,
+})
+
+Event:CreateButton({
+    Name = "Buy Cactus [250B]",
+    Callback = function()
+        remote:FireServer(buffer.fromstring("\22"), buffer.fromstring("\254\1\0\6\6Cactus"))
+    end,
+})
+
+Event:CreateButton({
+    Name = "Buy Palm Tree [1T]",
+    Callback = function()
+        remote:FireServer(buffer.fromstring("\22"), buffer.fromstring("\254\1\0\6\bPalmTree"))
+    end,
+})
+
+local Misc = Window:CreateTab("Misc")
+
+Misc:CreateSection("Misc")
+
+Misc:CreateButton({
+    Name = "FPS Boost",
+    Callback = function()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/CasperFlyModz/discord.gg-rips/main/FPSBooster.lua"))()
+        local e = workspace:FindFirstChild("MapDesign")
+        if e then e:Destroy() end
+    end,
+})
+
+Misc:CreateButton({
+    Name = "Allow Reset",
+    Callback = function()
+        plr.PlayerScripts:FindFirstChild("ResetOff").Enabled = false
+        game:GetService("StarterGui"):SetCore("ResetButtonCallback", true)
+    end,
+})
+
+Misc:CreateButton({
+    Name = "Free Container",
+    Callback = function()
+        remote:FireServer(buffer.fromstring("<"), buffer.fromstring("\254\0\0"))
+    end,
+})
+
+Misc:CreateSlider({
+    Name = "Walkspeed",
+    Range = {24, 500},
+    Increment = 1,
+    CurrentValue = 24,
+    Callback = function(Value)
+        plr.Character.Humanoid.WalkSpeed = Value
+    end,
+})
+
+Misc:CreateSlider({
+    Name = "Jumppower",
+    Range = {50, 500},
+    Increment = 1,
+    CurrentValue = 50,
+    Callback = function(Value)
+        plr.Character.Humanoid.JumpPower = Value
+        plr.Character.Humanoid.UseJumpPower = true
+    end,
+})
+
+Misc:CreateSlider({
+    Name = "Hip height",
+    Range = {0, 10},
+    Increment = 1,
+    CurrentValue = 2,
+    Callback = function(Value)
+        plr.Character.Humanoid.HipHeight = Value
+    end,
+})
+
+Misc:CreateToggle({
+    Name = "Auto Rotate",
+    CurrentValue = true,
+    Callback = function(Value)
+        plr.Character.Humanoid.AutoRotate = Value
     end,
 })
