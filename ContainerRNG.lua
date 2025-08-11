@@ -107,7 +107,7 @@ local Window = Rayfield:CreateWindow({
     Name = "▶ Container RNG ◀",
     Icon = 0,
     LoadingTitle = "Loading...",
-    LoadingSubtitle = "by Agreed 🥵",
+    LoadingSubtitle = "by xXGeminiXx - BeeBrained",
     Theme = "DarkBlue",
 })
 
@@ -269,9 +269,18 @@ Container:CreateToggle({
         _G.container = Value
         while _G.container do
             for _, container in ipairs(containerHolder:GetChildren()) do
-                remote:FireServer(buffer.fromstring("\6"), buffer.fromstring("\254\1\0\6." .. container.Name))
+                -- Try multiple approaches to open containers
+                pcall(function()
+                    remote:FireServer("6", "." .. container.Name)
+                end)
+                pcall(function()
+                    remote:FireServer(buffer.fromstring("\6"), buffer.fromstring("\254\1\0\6." .. container.Name))
+                end)
+                pcall(function()
+                    remote:FireServer(buffer.fromstring("\28"), buffer.fromstring("\254\1\0\6." .. container.Name))
+                end)
             end
-            task.wait()
+            task.wait(0.1)
         end
     end,
 })
@@ -310,10 +319,19 @@ Container:CreateToggle({
             local money = tonumber(plr:FindFirstChild("leaderstats") and plr.leaderstats:FindFirstChild("Money") and plr.leaderstats.Money.Value) or 0
 
             if containers < max and (not minMoney or money >= minMoney) then
-                remote:FireServer(buffer.fromstring("\4"), buffer.fromstring("\254\1\0\6" .. e))
+                -- Try multiple buying approaches
+                pcall(function()
+                    remote:FireServer("4", selectedContainer)
+                end)
+                pcall(function()
+                    remote:FireServer(buffer.fromstring("\4"), buffer.fromstring("\254\1\0\6" .. e))
+                end)
+                pcall(function()
+                    remote:FireServer(buffer.fromstring("\26"), buffer.fromstring("\254\1\0\6" .. e))
+                end)
             end
             
-            task.wait(buyDelay or 0)
+            task.wait(buyDelay or 0.5)
         end
     end,
 })
