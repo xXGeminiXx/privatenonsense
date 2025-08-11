@@ -1,8 +1,8 @@
 -- loadstring(game:HttpGet("https://raw.githubusercontent.com/xXGeminiXx/privatenonsense/refs/heads/main/ContainerRNG.lua?token=GHSAT0AAAAAADJBGXSP7MRELZECFHCTESYW2E2IJ3Q",true))()
-
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local remote = game:GetService("ReplicatedStorage"):WaitForChild("Modules"):WaitForChild("Shared"):WaitForChild("Warp"):WaitForChild("Index"):WaitForChild("Event"):WaitForChild("Reliable")
 local plr = Players.LocalPlayer
 
@@ -26,49 +26,83 @@ local customers = workspace:WaitForChild("Gameplay"):WaitForChild("Customers")
 local containerHolder = plot:WaitForChild("PlotLogic"):WaitForChild("ContainerHolder")
 local itemCache = plot.PlotLogic.ItemCache
 
--- Repo path for available containers
-local containerRepo
-do
-    local assets = ReplicatedStorage:WaitForChild("Assets")
-    containerRepo = assets:WaitForChild("Assets"):WaitForChild("Containers")
-end
+-- Static container mapping (fallback)
+local staticContainerMap = {
+    ["JunkContainer"] = string.char(13) .. "JunkContainer",
+    ["ScratchedContainer"] = string.char(18) .. "ScratchedContainer",
+    ["SealedContainer"] = string.char(15) .. "SealedContainer",
+    ["MilitaryContainer"] = string.char(17) .. "MilitaryContainer",
+    ["MetalContainer"] = string.char(14) .. "MetalContainer",
+    ["FrozenContainer"] = string.char(15) .. "FrozenContainer",
+    ["LavaContainer"] = string.char(13) .. "LavaContainer",
+    ["CorruptedContainer"] = string.char(18) .. "CorruptedContainer",
+    ["StormedContainer"] = string.char(16) .. "StormedContainer",
+    ["LightningContainer"] = string.char(18) .. "LightningContainer",
+    ["InfernalContainer"] = string.char(17) .. "InfernalContainer",
+    ["MysticContainer"] = string.char(15) .. "MysticContainer",
+    ["GlitchedContainer"] = string.char(17) .. "GlitchedContainer",
+    ["AstralContainer"] = string.char(15) .. "AstralContainer",
+    ["DreamContainer"] = string.char(14) .. "DreamContainer",
+    ["CelestialContainer"] = string.char(18) .. "CelestialContainer",
+    ["FireContainer"] = string.char(13) .. "FireContainer",
+    ["GoldenContainer"] = string.char(15) .. "GoldenContainer",
+    ["DiamondContainer"] = string.char(16) .. "DiamondContainer",
+    ["EmeraldContainer"] = string.char(16) .. "EmeraldContainer",
+    ["RubyContainer"] = string.char(13) .. "RubyContainer",
+    ["SapphireContainer"] = string.char(17) .. "SapphireContainer",
+    ["SpaceContainer"] = string.char(14) .. "SpaceContainer",
+    ["DeepSpaceContainer"] = string.char(18) .. "DeepSpaceContainer"
+}
 
--- Build container list/map from repo
-local opcodeByte = 15 -- default prefix used in purchase payload (string.char(opcodeByte))
+-- Dynamic container detection
 local containerOptions = {}
-local containerMap = {} -- name -> payloadSuffix (char..name)
+local containerMap = {}
 
-local function rebuildContainerLists()
-    table.clear(containerOptions)
-    table.clear(containerMap)
-
-    for _, obj in ipairs(containerRepo:GetChildren()) do
-        -- Accept Models/Folders (adjust if your repo uses another class)
-        if obj:IsA("Model") or obj:IsA("Folder") then
-            table.insert(containerOptions, obj.Name)
-            containerMap[obj.Name] = string.char(opcodeByte) .. obj.Name
+local function buildDynamicContainers()
+    -- Try to get containers from ReplicatedStorage
+    local success, containerRepo = pcall(function()
+        return ReplicatedStorage:WaitForChild("Assets", 2):WaitForChild("Assets", 2):WaitForChild("Containers", 2)
+    end)
+    
+    if success and containerRepo then
+        -- Wait a moment for children to replicate
+        local t0 = os.clock()
+        while #containerRepo:GetChildren() == 0 and os.clock() - t0 < 3 do
+            task.wait(0.1)
+        end
+        
+        -- Build from ReplicatedStorage
+        for _, obj in ipairs(containerRepo:GetChildren()) do
+            if obj:IsA("Model") or obj:IsA("Folder") then
+                table.insert(containerOptions, obj.Name)
+                -- Use static mapping if available, otherwise default
+                containerMap[obj.Name] = staticContainerMap[obj.Name] or (string.char(15) .. obj.Name)
+            end
         end
     end
-
+    
+    -- Fallback to static list if dynamic failed
+    if #containerOptions == 0 then
+        for name, _ in pairs(staticContainerMap) do
+            table.insert(containerOptions, name)
+        end
+        containerMap = staticContainerMap
+    end
+    
     table.sort(containerOptions)
 end
 
-local t0 = os.clock()
-while #containerRepo:GetChildren() == 0 and os.clock() - t0 < 5 do
-    task.wait(0.2)
-end
-rebuildContainerLists()
+buildDynamicContainers()
 
-local flowerMap = {}
-local flowerOptions = {}
+local flowerMap = {
+    ["BasicFlowerContainer"] = string.char(20) .. "BasicFlowerContainer",
+    ["GoodFlowerContainer"] = string.char(19) .. "GoodFlowerContainer"
+}
 
--- If flowers are in the same containerHolder, filter by name pattern
-for _, container in ipairs(containerHolder:GetChildren()) do
-    if container.Name:lower():find("flower") then
-        flowerMap[container.Name] = string.char(20) .. container.Name -- adjust char if needed
-        table.insert(flowerOptions, container.Name)
-    end
-end
+local flowerOptions = {
+    "BasicFlowerContainer",
+    "GoodFlowerContainer"
+}
 
 local Window = Rayfield:CreateWindow({
     Name = "▶ Container RNG ◀",
@@ -225,15 +259,17 @@ local Container = Window:CreateTab("Container")
 
 Container:CreateSection("Container")
 
--- Open all placed containers on your plot
 Container:CreateToggle({
-    Name = "Container Open (All on Plot)",
+    Name = "Container Open",
     CurrentValue = false,
     Callback = function(Value)
-        _G._openAll = Value
-        while _G._openAll do
+        if not containerHolder then
+            error("watafak no container folder")
+            return
+        end
+        _G.container = Value
+        while _G.container do
             for _, container in ipairs(containerHolder:GetChildren()) do
-                -- same open payload you used previously
                 remote:FireServer(buffer.fromstring("\28"), buffer.fromstring("\254\1\0\6." .. container.Name))
             end
             task.wait()
@@ -241,27 +277,17 @@ Container:CreateToggle({
     end,
 })
 
+local selectedContainer = containerOptions[1] or "JunkContainer"
 
--- Selected container (from repo list)
-local selectedContainer
-if #containerOptions == 0 then
-    warn("No containers found in ReplicatedStorage/Assets/Assets/Containers yet")
-else
-    local defaultChoice = table.find(containerOptions, "CamoContainer") and "CamoContainer" or containerOptions[1]
-    selectedContainer = defaultChoice
-
-    Container:CreateDropdown({
-        Name = "Buyable Container (from ReplicatedStorage/Assets/Assets/Containers)",
-        Options = containerOptions,
-        CurrentOption = defaultChoice,
-        MultipleOptions = false,
-        Callback = function(Option)
-            selectedContainer = typeof(Option) == "table" and Option[1] or Option
-        end,
-    })
-end
-
-
+Container:CreateDropdown({
+    Name = "Container",
+    Options = containerOptions,
+    CurrentOption = selectedContainer,
+    MultipleOptions = false,
+    Callback = function(Option)
+        selectedContainer = typeof(Option) == "table" and Option[1] or Option
+    end,
+})
 
 local buyDelay
 local maxContainers
@@ -328,40 +354,48 @@ Container:CreateSlider({
     end,
 })
 
-if #flowerOptions > 0 then
-    local selectedFlower = flowerOptions[1]
-    Container:CreateDropdown({
-        Name = "Flower Container",
-        Options = flowerOptions,
-        CurrentOption = selectedFlower,
-        MultipleOptions = false,
-        Callback = function(Option)
-            selectedFlower = typeof(Option) == "table" and Option[1] or Option
-        end,
-    })
+local selectedFlower = "BasicFlowerContainer"
 
-    local buyDelayFlower
-    Container:CreateToggle({
-        Name = "Auto Buy Flower Container",
-        CurrentValue = false,
-        Callback = function(Value)
-            _G.buyflower = Value
-            while _G.buyflower do
-                local e = flowerMap[selectedFlower]
-                if not e then break end
-                remote:FireServer(buffer.fromstring("\26"), buffer.fromstring("\254\1\0\6" .. e))
-                task.wait(buyDelayFlower or 0)
+Container:CreateDropdown({
+    Name = "Flower Container",
+    Options = flowerOptions,
+    CurrentOption = "BasicFlowerContainer",
+    MultipleOptions = false,
+    Callback = function(Option)
+        selectedFlower = typeof(Option) == "table" and Option[1] or Option
+    end,
+})
+
+local buyDelayFlower
+
+Container:CreateToggle({
+    Name = "Auto Buy Flower Container",
+    CurrentValue = false,
+    Callback = function(Value)
+        _G.buyflower = Value
+        while _G.buyflower do
+            local e = flowerMap[selectedFlower]
+            if not e then
+                warn("Invalid container:", selectedFlower)
+                break
             end
-        end,
-    })
-    Container:CreateSlider({
-        Name = "Buy Delay",
-        Range = {0, 60},
-        Increment = 0.1,
-        CurrentValue = 0,
-        Callback = function(Value) buyDelayFlower = Value end,
-    })
-end
+
+            remote:FireServer(buffer.fromstring("\26"), buffer.fromstring("\254\1\0\6" .. e))
+
+            task.wait(buyDelayFlower or 0)
+        end
+    end,
+})
+
+Container:CreateSlider({
+    Name = "Buy Delay",
+    Range = {0, 60},
+    Increment = 0.1,
+    CurrentValue = 0,
+    Callback = function(Value)
+        buyDelayFlower = Value
+    end,
+})
 
 local Upgrades = Window:CreateTab("Upgrades")
 
@@ -530,3 +564,4 @@ Misc:CreateToggle({
         plr.Character.Humanoid.AutoRotate = Value
     end,
 })
+
