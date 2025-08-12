@@ -74,18 +74,22 @@ local function buildDynamicContainers()
         for _, obj in ipairs(containerRepo:GetChildren()) do
             if obj:IsA("Model") or obj:IsA("Folder") then
                 table.insert(containerOptions, obj.Name)
-                -- Use static mapping if available, otherwise default
-                containerMap[obj.Name] = staticContainerMap[obj.Name] or (string.char(15) .. obj.Name)
+                -- Use static mapping if available, otherwise create default variants
+                if staticContainerMap[obj.Name] then
+                    containerMap[obj.Name] = staticContainerMap[obj.Name][1] -- Use first variant
+                else
+                    containerMap[obj.Name] = string.char(15) .. obj.Name
+                end
             end
         end
     end
     
     -- Fallback to static list if dynamic failed
     if #containerOptions == 0 then
-        for name, _ in pairs(staticContainerMap) do
+        for name, variants in pairs(staticContainerMap) do
             table.insert(containerOptions, name)
+            containerMap[name] = variants[1] -- Use first variant
         end
-        containerMap = staticContainerMap
     end
     
     table.sort(containerOptions)
@@ -269,10 +273,31 @@ Container:CreateToggle({
         _G.container = Value
         while _G.container do
             for _, container in ipairs(containerHolder:GetChildren()) do
-                -- Use the actual container's Name which is the UUID
-                remote:FireServer(buffer.fromstring("6"), buffer.fromstring("\254\1\0\6.CONTAINER_" .. container.Name))
+                if container and container.Name then
+                    -- Try different formats to ensure compatibility
+                    local success = false
+                    local formats = {
+                        "\254\1\0\6.CONTAINER_" .. container.Name,  -- Current format
+                        "\254\1\0\6." .. container.Name,            -- Simple format
+                        "\254\1\0\6" .. container.Name,             -- Direct format
+                    }
+                    
+                    for _, format in ipairs(formats) do
+                        local ok = pcall(function()
+                            remote:FireServer(buffer.fromstring("6"), buffer.fromstring(format))
+                        end)
+                        if ok then
+                            success = true
+                            break
+                        end
+                    end
+                    
+                    if not success then
+                        warn("Failed to open container:", container.Name)
+                    end
+                end
             end
-            task.wait()
+            task.wait(0.1)
         end
     end,
 })
@@ -302,7 +327,8 @@ Container:CreateToggle({
             local e = containerMap[selectedContainer]
             if not e then
                 warn("Invalid container:", selectedContainer)
-                break
+                task.wait(1)
+                continue
             end
 
             local max = maxContainers or 8
@@ -311,10 +337,30 @@ Container:CreateToggle({
             local money = tonumber(plr:FindFirstChild("leaderstats") and plr.leaderstats:FindFirstChild("Money") and plr.leaderstats.Money.Value) or 0
 
             if containers < max and (not minMoney or money >= minMoney) then
-                remote:FireServer(buffer.fromstring("4"), buffer.fromstring("\254\1\0\6" .. e))
+                -- Try multiple formats for buying
+                local success = false
+                local formats = {
+                    "\254\1\0\6" .. e,           -- Current format
+                    "\254\1\0\6\r" .. selectedContainer, -- Alternative format
+                    "\254\1\0\6" .. selectedContainer,   -- Direct name format
+                }
+                
+                for _, format in ipairs(formats) do
+                    local ok = pcall(function()
+                        remote:FireServer(buffer.fromstring("4"), buffer.fromstring(format))
+                    end)
+                    if ok then
+                        success = true
+                        break
+                    end
+                end
+                
+                if not success then
+                    warn("Failed to buy container:", selectedContainer)
+                end
             end
             
-            task.wait(buyDelay or 0)
+            task.wait(buyDelay or 1)
         end
     end,
 })
