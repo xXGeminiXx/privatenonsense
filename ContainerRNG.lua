@@ -273,31 +273,9 @@ Container:CreateToggle({
         _G.container = Value
         while _G.container do
             for _, container in ipairs(containerHolder:GetChildren()) do
-                if container and container.Name then
-                    -- Try different formats to ensure compatibility
-                    local success = false
-                    local formats = {
-                        "\254\1\0\6.CONTAINER_" .. container.Name,  -- Current format
-                        "\254\1\0\6." .. container.Name,            -- Simple format
-                        "\254\1\0\6" .. container.Name,             -- Direct format
-                    }
-                    
-                    for _, format in ipairs(formats) do
-                        local ok = pcall(function()
-                            remote:FireServer(buffer.fromstring("6"), buffer.fromstring(format))
-                        end)
-                        if ok then
-                            success = true
-                            break
-                        end
-                    end
-                    
-                    if not success then
-                        warn("Failed to open container:", container.Name)
-                    end
-                end
+                remote:FireServer(buffer.fromstring("6"), buffer.fromstring("\254\001\000\006.CONTAINER_" .. container.Name))
             end
-            task.wait(0.1)
+            task.wait()
         end
     end,
 })
