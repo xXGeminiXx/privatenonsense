@@ -269,6 +269,7 @@ Container:CreateToggle({
         _G.container = Value
         while _G.container do
             for _, container in ipairs(containerHolder:GetChildren()) do
+                -- Use the actual container's Name which is the UUID
                 remote:FireServer(buffer.fromstring("6"), buffer.fromstring("\254\1\0\6.CONTAINER_" .. container.Name))
             end
             task.wait()
