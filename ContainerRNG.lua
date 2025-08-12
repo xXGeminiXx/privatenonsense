@@ -269,7 +269,7 @@ Container:CreateToggle({
         _G.container = Value
         while _G.container do
             for _, container in ipairs(containerHolder:GetChildren()) do
-                remote:FireServer(buffer.fromstring("\6"), buffer.fromstring("\254\1\0\6." .. container.Name))
+                remote:FireServer(buffer.fromstring("6"), buffer.fromstring("\254\1\0\6.CONTAINER_" .. container.Name))
             end
             task.wait()
         end
@@ -310,7 +310,7 @@ Container:CreateToggle({
             local money = tonumber(plr:FindFirstChild("leaderstats") and plr.leaderstats:FindFirstChild("Money") and plr.leaderstats.Money.Value) or 0
 
             if containers < max and (not minMoney or money >= minMoney) then
-                remote:FireServer(buffer.fromstring("\4"), buffer.fromstring("\254\1\0\6" .. e))
+                remote:FireServer(buffer.fromstring("4"), buffer.fromstring("\254\1\0\6" .. e))
             end
             
             task.wait(buyDelay or 0)
